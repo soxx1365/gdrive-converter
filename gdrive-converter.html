@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GDrive Link Converter</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #242424;
+    --border: #2e2e2e;
+    --accent: #4ade80;
+    --accent-dim: rgba(74,222,128,0.12);
+    --text: #f0f0f0;
+    --muted: #888;
+    --danger: #f87171;
+    --danger-dim: rgba(248,113,113,0.1);
+    --font: 'IBM Plex Sans', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+    --radius: 8px;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+  .card {
+    width: 100%;
+    max-width: 560px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .header h1 { font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+  .body { padding: 1.5rem; }
+  label { display: block; font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  input[type="text"] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.15s;
+    margin-bottom: 1.25rem;
+  }
+  input[type="text"]::placeholder { color: #444; }
+  input[type="text"]:focus { border-color: var(--accent); }
+  .result-block {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    display: none;
+  }
+  .result-block.visible { display: block; }
+  .result-label { font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .result-url { font-family: var(--mono); font-size: 12px; color: var(--accent); word-break: break-all; line-height: 1.6; margin-bottom: 10px; }
+  .error-box {
+    background: var(--danger-dim);
+    border: 1px solid rgba(248,113,113,0.3);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--danger);
+    display: none;
+    margin-bottom: 1rem;
+  }
+  .error-box.visible { display: block; }
+  button {
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  button:active { transform: scale(0.97); }
+  svg.icon { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <div class="dot"></div>
+    <h1>GDrive Link Converter</h1>
+  </div>
+  <div class="body">
+    <label>Paste Google Drive link</label>
+    <input type="text" id="input-link" placeholder="https://drive.google.com/file/d/.../view" oninput="convert()" autocomplete="off" spellcheck="false" />
+    <div class="error-box" id="error-box"></div>
+    <div class="result-block" id="result-block">
+      <div class="result-label">Direct download link</div>
+      <div class="result-url" id="result-url"></div>
+      <button id="copy-btn" onclick="copyLink()">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copy link
+      </button>
+    </div>
+  </div>
+</div>
+<script>
+function extractFileId(url) {
+  var patterns = [
+    /\/file\/d\/([a-zA-Z0-9_-]+)/,
+    /\/d\/([a-zA-Z0-9_-]+)/,
+    /[?&]id=([a-zA-Z0-9_-]+)/,
+    /open\?id=([a-zA-Z0-9_-]+)/
+  ];
+  for (var i = 0; i < patterns.length; i++) {
+    var m = url.match(patterns[i]);
+    if (m) return m[1];
+  }
+  return null;
+}
+function convert() {
+  var input = document.getElementById('input-link').value.trim();
+  var errorBox = document.getElementById('error-box');
+  var resultBlock = document.getElementById('result-block');
+  var resultUrl = document.getElementById('result-url');
+  var copyBtn = document.getElementById('copy-btn');
+  errorBox.className = 'error-box';
+  resultBlock.className = 'result-block';
+  if (!input) return;
+  var fileId = extractFileId(input);
+  if (fileId) {
+    resultUrl.textContent = 'https://drive.google.com/uc?export=download&id=' + fileId;
+    resultBlock.className = 'result-block visible';
+    copyBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy link';
+    copyBtn.style.color = '';
+  } else {
+    errorBox.textContent = "Couldn't find a file ID. Make sure this is a valid Google Drive file link.";
+    errorBox.className = 'error-box visible';
+  }
+}
+function copyLink() {
+  var text = document.getElementById('result-url').textContent;
+  var btn = document.getElementById('copy-btn');
+  navigator.clipboard.writeText(text).then(function() {
+    btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
+    btn.style.color = 'var(--accent)';
+    setTimeout(function() {
+      btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy link';
+      btn.style.color = '';
+    }, 2000);
+  });
+}
+</script>
+</body>
+</html>
